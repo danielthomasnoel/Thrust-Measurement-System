@@ -112,7 +112,7 @@ if(Serial.available())
 // Start RPM Loop
 detachInterrupt(digitalPinToInterrupt(2));           //detaches the interrupt
 time=millis()-oldtime;        //finds the time 
-rpm=(rev/time)*30000;         //calculates rpm
+rpm=(rev/time)*30000;         //calculates rpm  (60,000 is for one blade, 30,000 is for two etc.)
 oldtime=millis();             //saves the current time
 rev=0;
 
