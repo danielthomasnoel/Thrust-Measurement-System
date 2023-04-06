@@ -1,0 +1,155 @@
+#include <Servo.h> //ESC Control
+#include <SD.h> //SD Card Writing
+#include "HX711.h" //Load Cell
+#include <LiquidCrystal.h> //lcd screen
+
+// Setting variables
+float rev=0;
+int rpm;
+int oldtime=0;
+int time = 0; //start time at 0
+
+Servo ESC; // create servo object to control the ESC
+int potValue;  // value from the analog pin
+
+int ESCpin = 9; //set ESC control pin
+int CS_PIN = 10; //set SD Card writing pin
+
+//RPM Setup
+void isr() //interrupt service routine
+{
+rev++;
+}
+
+// Loadcell Stuff
+#define LOADCELL_DOUT_PIN  7 //SCK
+#define LOADCELL_SCK_PIN  6 //DT
+HX711 scale;
+float calibration_factor = 40; //calibration from hanging weight on propellor tip (~981 mN Force)
+
+// Initialize the first LCD with the pins used
+LiquidCrystal lcd1(22, 23, 24, 25, 26, 27);
+
+// Initialize the second LCD with the pins used
+LiquidCrystal lcd2(30, 31, 32, 33, 34, 35);
+
+void setup() {
+  
+// Set up the first LCD's number of columns and rows
+lcd1.begin(16, 2);
+  
+// Set up the second LCD's number of columns and rows
+lcd2.begin(16, 2);
+
+// Start Loadcell Setup
+Serial.begin(9600);
+ scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+ scale.set_scale();
+ scale.tare(); //Reset the scale to 0
+  
+ long zero_factor = scale.read_average(); //Get a baseline reading
+ Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+ Serial.println(zero_factor);
+// End Loadcell Setup
+
+// Start ESC Control Setup
+  ESC.attach(ESCpin,1000,2000); // (pin, min pulse width, max pulse width in microseconds)
+// End ESC Control Setup 
+
+// Start SD Card Setup
+Serial.println("Initializing Card");
+pinMode(CS_PIN, OUTPUT); //SC pin must be configured as an output
+
+if (!SD.begin(CS_PIN))
+  {
+lcd1.print("SD Card Failure");
+  }    else{
+lcd1.print("SD Card Ready");
+  }
+
+File dataFile = SD.open("log.csv", FILE_WRITE);
+    if(dataFile)
+    {dataFile.print("TimeStamp");
+    dataFile.print(",");
+    dataFile.print("Thrust (mN)");
+    dataFile.print(",");
+    dataFile.println("RPMs");
+    dataFile.close();
+    }
+// End SD Card Setup
+
+delay(2000);
+}
+
+void loop() {
+  
+// Start RPM Loop
+attachInterrupt(digitalPinToInterrupt(2),isr,RISING);
+// End RPM Loop
+
+// Start Loadcell loop
+if(Serial.available())
+  {
+    char temp = Serial.read();
+    if(temp == '+' || temp == 'a')
+      calibration_factor += 10;
+    else if(temp == '-' || temp == 'z')
+      calibration_factor -= 10;
+  }
+  
+  scale.set_scale(calibration_factor); //Adjust to this calibration factor
+  Serial.print("Reading: ");
+  Serial.print(scale.get_units(),1);
+  Serial.print(" mN");
+// End loadcell loop
+
+// Start ESC Control from potentiometer
+  potValue = analogRead(A0);   // reads the value of the potentiometer (value between 0 and 1023)
+  potValue = map(potValue, 0, 1023, 0, 255);   // scale it to use it with the servo library (value between 0 and 180)
+  ESC.write(potValue);    // Send the signal to the ESC
+// End ESC Control from potentiometer
+
+// Start RPM Loop
+detachInterrupt(digitalPinToInterrupt(2));           //detaches the interrupt
+time=millis()-oldtime;        //finds the time 
+rpm=(rev/time)*30000;         //calculates rpm
+oldtime=millis();             //saves the current time
+rev=0;
+
+attachInterrupt(digitalPinToInterrupt(2),isr,RISING);
+Serial.println(rpm);
+// End RPM Loop
+
+// Start LCD Print Loop
+lcd1.clear();
+lcd1.setCursor(0,0);
+lcd1.print("Thrust");
+lcd1.setCursor(0,1);
+lcd1.print(scale.get_units(),1);
+lcd1.print(" mN");
+
+lcd2.clear();
+lcd2.setCursor(0,0);
+lcd2.print("Rots Per Min");
+lcd2.setCursor(0,1);
+lcd2.print(rpm);
+lcd2.print(" RPMs");
+// End LCD Print Loop
+
+// Start SD Card Loop (THIS NEEDS TO BE EDITED TO RECORD ACTUAL DATA)
+long timeStamp = millis();
+
+    //Open a file and write to it
+    File dataFile = SD.open("log.csv", FILE_WRITE);
+    if(dataFile)
+    {dataFile.print(timeStamp);
+    dataFile.print(",");
+    dataFile.print(scale.get_units(),1);
+    dataFile.print(",");
+    dataFile.println(rpm);
+    dataFile.close(); //Data isn't written until close() is run
+    }
+
+    delay(1000);
+ // End SD Card Loop
+  }
