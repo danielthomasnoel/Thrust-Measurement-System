@@ -112,7 +112,7 @@ if(Serial.available())
 // Start RPM Loop
 detachInterrupt(digitalPinToInterrupt(2));           //detaches the interrupt
 time=millis()-oldtime;        //finds the time 
-rpm=(rev/time)*30000;         //calculates rpm  (60,000 is for one blade, 30,000 is for two etc.)
+rpm=(rev/time)*30000;         //calculates rpm (60,000 is for one blade, 30,000 is for two etc.)
 oldtime=millis();             //saves the current time
 rev=0;
 
@@ -136,7 +136,7 @@ lcd2.print(rpm);
 lcd2.print(" RPMs");
 // End LCD Print Loop
 
-// Start SD Card Loop (THIS NEEDS TO BE EDITED TO RECORD ACTUAL DATA)
+// Start SD Card Loop
 long timeStamp = millis();
 
     //Open a file and write to it
